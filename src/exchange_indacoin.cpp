@@ -109,17 +109,18 @@ void Exchange_Indacoin::reloadDepth()
 
 void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 {
-	bool success=!data.startsWith("{\"success\":0");
-	QString errorString;
-	if(!success)errorString=getMidData("error\":\"","\"",&data);
+	if(debugLevel)logThread->writeLog("RCV: "+data);
+	bool success=data.startsWith("{")&&!data.startsWith("{\"error\":")||data.startsWith("[{");
+	if(success&&data.startsWith("401"))success=false;
 
 	if(debugLevel)logThread->writeLog("RCV: "+data);
 
 	switch(reqType)
 	{
 	case 103: //ticker
+		//need smth
 		{
-			QByteArray tickerHigh=getMidData("high\":",",\"",&data);
+			QByteArray tickerHigh=getMidData("max_price\":",",\"",&data);
 			if(!tickerHigh.isEmpty())
 			{
 				double newTickerHigh=tickerHigh.toDouble();
@@ -127,7 +128,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				lastTickerHigh=newTickerHigh;
 			}
 
-			QByteArray tickerLow=getMidData("\"low\":",",\"",&data);
+			QByteArray tickerLow=getMidData("\"min_price\":",",\"",&data);
 			if(!tickerLow.isEmpty())
 			{
 				double newTickerLow=tickerLow.toDouble();
@@ -135,7 +136,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				lastTickerLow=newTickerLow;
 			}
 
-			QByteArray tickerSell=getMidData("\"sell\":",",\"",&data);
+		/*	QByteArray tickerSell=getMidData("\"sell\":",",\"",&data);
 			if(!tickerSell.isEmpty())
 			{
 				double newTickerSell=tickerSell.toDouble();
@@ -149,9 +150,9 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				double newTickerBuy=tickerBuy.toDouble();
 				if(newTickerBuy!=lastTickerBuy)emit tickerBuyChanged(newTickerBuy);
 				lastTickerBuy=newTickerBuy;
-			}
+			}*/
 
-			QByteArray tickerVolume=getMidData("\"vol_cur\":",",\"",&data);
+			QByteArray tickerVolume=getMidData("\"volume_base\":",",\"",&data);
 			if(!tickerVolume.isEmpty())
 			{
 				double newTickerVolume=tickerVolume.toDouble();
@@ -176,6 +177,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 		}
 		break;//ticker
 	case 109: //trades
+		//need smth
 		{
 			if(data.size()<10)break;
 			QByteArray currentRequestSymbol=getMidData("\"","\":[{",&data).toUpper().replace("_","");
@@ -208,7 +210,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 			else delete newTradesItems;
 		}
 		break;//trades
-	case 110: //Fee
+	/*(case 110: //Fee
 		{
 			QStringList feeList=QString(getMidData("pairs\":{\"","}}}",&data)).split("},\"");
 			for(int n=0;n<feeList.count();n++)
@@ -221,8 +223,11 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 			}
 		}
 		break;// Fee
-	case 111: //depth
-		if(data.startsWith("{\""+baseValues.currentPair.currRequestPair+"\":{\"asks"))
+	*/
+	case 111: //all active orders 
+		//All ok
+		{
+		if(data.startsWith("{\"bids\""))
 		{
 			emit depthRequestReceived();
 
@@ -237,47 +242,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				double groupedPrice=0.0;
 				double groupedVolume=0.0;
 				int rowCounter=0;
-
-				for(int n=0;n<asksList.count();n++)
-				{
-					if(baseValues.depthCountLimit&&rowCounter>=baseValues.depthCountLimit)break;
-					QStringList currentPair=asksList.at(n).split(",");
-					if(currentPair.count()!=2)continue;
-					double priceDouble=currentPair.first().toDouble();
-					double amount=currentPair.last().toDouble();
-
-					if(baseValues.groupPriceValue>0.0)
-					{
-						if(n==0)
-						{
-							emit depthFirstOrder(priceDouble,amount,true);
-							groupedPrice=baseValues.groupPriceValue*(int)(priceDouble/baseValues.groupPriceValue);
-							groupedVolume=amount;
-						}
-						else
-						{
-							bool matchCurrentGroup=priceDouble<groupedPrice+baseValues.groupPriceValue;
-							if(matchCurrentGroup)groupedVolume+=amount;
-							if(!matchCurrentGroup||n==asksList.count()-1)
-							{
-								depthSubmitOrder(&currentAsksMap,groupedPrice+baseValues.groupPriceValue,groupedVolume,true);
-								rowCounter++;
-								groupedVolume=amount;
-								groupedPrice+=baseValues.groupPriceValue;
-							}
-						}
-					}
-					else
-					{
-						depthSubmitOrder(&currentAsksMap,priceDouble,amount,true);
-						rowCounter++;
-					}
-				}
-				QList<double> currentAsksList=lastDepthAsksMap.keys();
-				for(int n=0;n<currentAsksList.count();n++)
-					if(currentAsksMap.value(currentAsksList.at(n),0)==0)depthUpdateOrder(currentAsksList.at(n),0.0,true);
-				lastDepthAsksMap=currentAsksMap;
-
+				
 				QMap<double,double> currentBidsMap;
 				QStringList bidsList=QString(getMidData("bids\":[[","]]",&data)).split("],[");
 				groupedPrice=0.0;
@@ -323,12 +288,53 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 					if(currentBidsMap.value(currentBidsList.at(n),0)==0)depthUpdateOrder(currentBidsList.at(n),0.0,false);
 				lastDepthBidsMap=currentBidsMap;
 
+				for(int n=0;n<asksList.count();n++)
+				{
+					if(baseValues.depthCountLimit&&rowCounter>=baseValues.depthCountLimit)break;
+					QStringList currentPair=asksList.at(n).split(",");
+					if(currentPair.count()!=2)continue;
+					double priceDouble=currentPair.first().toDouble();
+					double amount=currentPair.last().toDouble();
+
+					if(baseValues.groupPriceValue>0.0)
+					{
+						if(n==0)
+						{
+							emit depthFirstOrder(priceDouble,amount,true);
+							groupedPrice=baseValues.groupPriceValue*(int)(priceDouble/baseValues.groupPriceValue);
+							groupedVolume=amount;
+						}
+						else
+						{
+							bool matchCurrentGroup=priceDouble<groupedPrice+baseValues.groupPriceValue;
+							if(matchCurrentGroup)groupedVolume+=amount;
+							if(!matchCurrentGroup||n==asksList.count()-1)
+							{
+								depthSubmitOrder(&currentAsksMap,groupedPrice+baseValues.groupPriceValue,groupedVolume,true);
+								rowCounter++;
+								groupedVolume=amount;
+								groupedPrice+=baseValues.groupPriceValue;
+							}
+						}
+					}
+					else
+					{
+						depthSubmitOrder(&currentAsksMap,priceDouble,amount,true);
+						rowCounter++;
+					}
+				}
+				QList<double> currentAsksList=lastDepthAsksMap.keys();
+				for(int n=0;n<currentAsksList.count();n++)
+					if(currentAsksMap.value(currentAsksList.at(n),0)==0)depthUpdateOrder(currentAsksList.at(n),0.0,true);
+				lastDepthAsksMap=currentAsksMap;
+
 				emit depthSubmitOrders(depthAsks, depthBids);
 				depthAsks=0;
 				depthBids=0;
 			}
 		}
 		else if(debugLevel)logThread->writeLog("Invalid depth data:"+data,2);
+		}
 		break;
 	case 202: //info
 		{
@@ -522,12 +528,12 @@ void Exchange_Indacoin::secondSlot()
 	if(!isReplayPending(202))sendToApi(202,"",true,baseValues.httpSplitPackets,"method=getInfo&");
 
 	if(!tickerOnly&&!isReplayPending(204))sendToApi(204,"",true,baseValues.httpSplitPackets,"method=ActiveOrders&");
-	if(!isReplayPending(103))sendToApi(103,"ticker/"+baseValues.currentPair.currRequestPair,false,baseValues.httpSplitPackets);
-	if(!isReplayPending(109))sendToApi(109,"trades/"+baseValues.currentPair.currRequestPair,false,baseValues.httpSplitPackets);
+	if(!isReplayPending(103))sendToApi(103,"ticker",false,baseValues.httpSplitPackets);
+	if(!isReplayPending(109))sendToApi(109,"trades/"+baseValues.currentPair.currRequestPair,false,baseValues.httpSplitPackets);//+tid!!!
 	if(depthEnabled&&(forceDepthLoad||/*infoCounter==3&&*/!isReplayPending(111)))
 	{
 		emit depthRequested();
-		sendToApi(111,"depth/"+baseValues.currentPair.currRequestPair+"?limit="+baseValues.depthCountLimitStr,false,baseValues.httpSplitPackets);
+		sendToApi(111,"orderbook?pair={"+baseValues.currentPair.currRequestPair+'}',false,baseValues.httpSplitPackets);
 		forceDepthLoad=false;
 	}
 
@@ -554,31 +560,19 @@ void Exchange_Indacoin::getHistory(bool force)
 void Exchange_Indacoin::buy(double apiBtcToBuy, double apiPriceToBuy)
 {
 	if(tickerOnly)return;
-	QByteArray btcToBuy=QByteArray::number(apiBtcToBuy,'f',8);
-	int digitsToCut=baseValues.currentPair.currADecimals;
-	int dotPos=btcToBuy.indexOf('.');
-	if(dotPos>0)
-	{
-		int toCut=(btcToBuy.size()-dotPos-1)-digitsToCut;
-		if(toCut>0)btcToBuy.remove(btcToBuy.size()-toCut-1,toCut);
-	}
-	QByteArray data="method=Trade&pair="+baseValues.currentPair.currRequestPair+"&type=buy&rate="+QByteArray::number(apiPriceToBuy,'f',baseValues.currentPair.priceDecimals)+"&amount="+btcToBuy+"&";
-	if(debugLevel)logThread->writeLog("Buy: "+data,2);
-	sendToApi(306,"",true,true,data);
+	QByteArray data="buyorder/{pair:\'"+baseValues.currentPair.currRequestPair;
+	data+="\',price:\'"+QByteArray::number(apiPriceToBuy,'f',baseValues.currentPair.priceDecimals);
+	data+="\',amount:\'"+QByteArray::number(apiBtcToBuy,'f',8)+"\'}";
+	if(debugLevel)logThread->writeLog("Sell: "+data,2);
+	sendToApi(307,"",true,true,data);
 }
 
 void Exchange_Indacoin::sell(double apiBtcToSell, double apiPriceToSell)
 {
 	if(tickerOnly)return;
-
-	QByteArray btcToSell=QByteArray::number(apiBtcToSell,'f',8);
-	int dotPos=btcToSell.indexOf('.');
-	if(dotPos>0)
-	{
-		int toCut=(btcToSell.size()-dotPos-1)-baseValues.currentPair.currADecimals;
-		if(toCut>0)btcToSell.remove(btcToSell.size()-toCut-1,toCut);
-	}
-	QByteArray data="method=Trade&pair="+baseValues.currentPair.currRequestPair+"&type=sell&rate="+QByteArray::number(apiPriceToSell,'f',baseValues.currentPair.priceDecimals)+"&amount="+btcToSell+"&";
+	QByteArray data="sellorder/{pair:\'"+baseValues.currentPair.currRequestPair;
+	data+="\',price:\'"+QByteArray::number(apiPriceToSell,'f',baseValues.currentPair.priceDecimals);
+	data+="\',amount:\'"+QByteArray::number(apiBtcToSell,'f',8)+"\'}";
 	if(debugLevel)logThread->writeLog("Sell: "+data,2);
 	sendToApi(307,"",true,true,data);
 }
@@ -587,8 +581,8 @@ void Exchange_Indacoin::cancelOrder(QByteArray order)
 {
 	if(tickerOnly)return;
 
-	order.prepend("method=CancelOrder&order_id=");
-	order.append("&");
+	order.prepend("cancelorder/{i:\'");
+	order.append("\'}");
 	if(debugLevel)logThread->writeLog("Cancel order: "+order,2);
 	sendToApi(305,"",true,true,order);
 }
@@ -597,7 +591,7 @@ void Exchange_Indacoin::sendToApi(int reqType, QByteArray method, bool auth, boo
 {
 	if(julyHttp==0)
 	{ 
-		julyHttp=new JulyHttp("btc-e.com","Key: "+privateRestKey+"\r\n",this);
+		julyHttp=new JulyHttp("indacoin.com","",this);
 		connect(julyHttp,SIGNAL(anyDataReceived()),baseValues_->mainWindow_,SLOT(anyDataReceived()));
 		connect(julyHttp,SIGNAL(apiDown(bool)),baseValues_->mainWindow_,SLOT(setApiDown(bool)));
 		connect(julyHttp,SIGNAL(setDataPending(bool)),baseValues_->mainWindow_,SLOT(setDataPending(bool)));
@@ -610,9 +604,9 @@ void Exchange_Indacoin::sendToApi(int reqType, QByteArray method, bool auth, boo
 	{
 		QByteArray postData=commands+"nonce="+QByteArray::number(++privateNonce);
 		if(sendNow)
-			julyHttp->sendData(reqType, "POST /tapi/"+method, postData, "Sign: "+hmacSha512(privateRestSign,postData).toHex()+"\r\n");
+			julyHttp->sendData(reqType, "POST /api/"+method, postData, "Sign: "+hmacSha512(privateRestSign,postData).toHex()+"\r\n");
 		else
-			julyHttp->prepareData(reqType, "POST /tapi/"+method, postData, "Sign: "+hmacSha512(privateRestSign,postData).toHex()+"\r\n");
+			julyHttp->prepareData(reqType, "POST /api/"+method, postData, "Sign: "+hmacSha512(privateRestSign,postData).toHex()+"\r\n");
 	}
 	else
 	{

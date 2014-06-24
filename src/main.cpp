@@ -349,20 +349,20 @@ int main(int argc, char *argv[])
 			{
 			case 0:
 				{//Mt.Gox
-				baseValues.restSign=QByteArray::fromBase64(newPassword.getRestSign().toAscii());
-				encryptedData=JulyAES256::encrypt("Qt Bitcoin Trader\r\n"+baseValues.restKey+"\r\n"+baseValues.restSign.toBase64()+"\r\n"+QUuid::createUuid().toByteArray(),tryPassword.toAscii());
+					baseValues.restSign=QByteArray::fromBase64(newPassword.getRestSign().toAscii());
+					encryptedData=JulyAES256::encrypt("Qt Bitcoin Trader\r\n"+baseValues.restKey+"\r\n"+baseValues.restSign.toBase64()+"\r\n"+QUuid::createUuid().toByteArray(),tryPassword.toAscii());
 				}
 				break;
 			case 1:
 				{//BTC-e
-				baseValues.restSign=newPassword.getRestSign().toAscii();
-				encryptedData=JulyAES256::encrypt("Qt Bitcoin Trader\r\n"+baseValues.restKey+"\r\n"+baseValues.restSign.toBase64()+"\r\n"+QUuid::createUuid().toByteArray(),tryPassword.toAscii());
+					baseValues.restSign=newPassword.getRestSign().toAscii();
+					encryptedData=JulyAES256::encrypt("Qt Bitcoin Trader\r\n"+baseValues.restKey+"\r\n"+baseValues.restSign.toBase64()+"\r\n"+QUuid::createUuid().toByteArray(),tryPassword.toAscii());
 				}
 				break;
 			case 2:
 				{//Bitstamp
-				baseValues.restSign=newPassword.getRestSign().toAscii();
-				encryptedData=JulyAES256::encrypt("Qt Bitcoin Trader\r\n"+baseValues.restKey+"\r\n"+baseValues.restSign.toBase64()+"\r\n"+QUuid::createUuid().toByteArray(),tryPassword.toAscii());
+					baseValues.restSign=newPassword.getRestSign().toAscii();
+					encryptedData=JulyAES256::encrypt("Qt Bitcoin Trader\r\n"+baseValues.restKey+"\r\n"+baseValues.restSign.toBase64()+"\r\n"+QUuid::createUuid().toByteArray(),tryPassword.toAscii());
 				}
 				break;
 			case 3:
@@ -373,6 +373,12 @@ int main(int argc, char *argv[])
 				break;
 			case 4:
 				{//Bitfinex
+					baseValues.restSign=newPassword.getRestSign().toAscii();
+					encryptedData=JulyAES256::encrypt("Qt Bitcoin Trader\r\n"+baseValues.restKey+"\r\n"+baseValues.restSign.toBase64()+"\r\n"+QUuid::createUuid().toByteArray(),tryPassword.toAscii());
+				}
+				break;
+			case 5:
+				{//Indacoin
 					baseValues.restSign=newPassword.getRestSign().toAscii();
 					encryptedData=JulyAES256::encrypt("Qt Bitcoin Trader\r\n"+baseValues.restKey+"\r\n"+baseValues.restSign.toBase64()+"\r\n"+QUuid::createUuid().toByteArray(),tryPassword.toAscii());
 				}
