@@ -30,9 +30,18 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "exchange_indacoin.h"
-#include <openssl/hmac.h>
 #include "main.h"
 #include <QDateTime>
+#include <string>
+#include <openssl/ec.h>
+#include <openssl/ecdsa.h>
+#include <openssl/bn.h>
+
+static const std::string base64_chars = 
+             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+             "abcdefghijklmnopqrstuvwxyz"
+             "0123456789+/";
+
 
 Exchange_Indacoin::Exchange_Indacoin(QByteArray pRestSign, QByteArray pRestKey) 
 	: Exchange()
@@ -118,7 +127,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 	switch(reqType)
 	{
 	case 103: //ticker
-		//need smth
+		//everything ok
 		{
 			QByteArray tickerHigh=getMidData("max_price\":",",\"",&data);
 			if(!tickerHigh.isEmpty())
@@ -136,7 +145,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				lastTickerLow=newTickerLow;
 			}
 
-		/*	QByteArray tickerSell=getMidData("\"sell\":",",\"",&data);
+			QByteArray tickerSell=getMidData("\"last_buy_price\":",",\"",&data);
 			if(!tickerSell.isEmpty())
 			{
 				double newTickerSell=tickerSell.toDouble();
@@ -144,13 +153,13 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				lastTickerSell=newTickerSell;
 			}
 
-			QByteArray tickerBuy=getMidData("\"buy\":",",\"",&data);
+			QByteArray tickerBuy=getMidData("\"last_sell_price\":",",\"",&data);
 			if(!tickerBuy.isEmpty())
 			{
 				double newTickerBuy=tickerBuy.toDouble();
 				if(newTickerBuy!=lastTickerBuy)emit tickerBuyChanged(newTickerBuy);
 				lastTickerBuy=newTickerBuy;
-			}*/
+			}
 
 			QByteArray tickerVolume=getMidData("\"volume_base\":",",\"",&data);
 			if(!tickerVolume.isEmpty())
@@ -160,14 +169,10 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				lastTickerVolume=newTickerVolume;
 			}
 
-			quint32 newTickerDate=getMidData("\"updated\":","}",&data).toUInt();
-			if(lastTickerDate<newTickerDate)
-			{
-				lastTickerDate=newTickerDate;
-				QByteArray tickerLast=getMidData("\"last\":",",\"",&data);
-				double tickerLastDouble=tickerLast.toDouble();
-				if(tickerLastDouble>0.0)emit tickerLastChanged(tickerLastDouble);
-			}
+			
+			QByteArray tickerLast=getMidData("last_deal_price\":",",\"",&data);
+			double newTickerLast=tickerLast.toDouble();
+			emit tickerLastChanged(newTickerLast);
 
 			if(isFirstTicker)
 			{
@@ -177,7 +182,6 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 		}
 		break;//ticker
 	case 109: //trades
-		//need smth
 		{
 			if(data.size()<10)break;
 			QByteArray currentRequestSymbol=getMidData("\"","\":[{",&data).toUpper().replace("_","");
@@ -188,7 +192,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 			{
 				QByteArray tradeData=tradeList.at(n).toAscii()+"}";
 				TradesItem newItem;
-				newItem.date=getMidData("timestamp\":","}",&tradeData).toUInt();
+				newItem.date=getMidData("date\":","}",&tradeData).toUInt();
 				newItem.price=getMidData("\"price\":",",\"",&tradeData).toDouble();
 				if(lastFetchTid<0&&newItem.date<-lastFetchTid)continue;
 				quint32 currentTid=getMidData("\"tid\":",",\"",&tradeData).toUInt();
@@ -201,7 +205,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				}
 				newItem.amount=getMidData("\"amount\":",",\"",&tradeData).toDouble();
 				newItem.symbol=currentRequestSymbol;
-				newItem.orderType=getMidData("\"type\":\"","\"",&tradeData)=="ask"?1:-1;
+				newItem.orderType=getMidData("\"oper_type\":\"","\"",&tradeData)=="0"?1:-1;
 
 				if(newItem.isValid())(*newTradesItems)<<newItem;
 				else if(debugLevel)logThread->writeLog("Invalid trades fetch data line:"+tradeData,2);
@@ -210,20 +214,6 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 			else delete newTradesItems;
 		}
 		break;//trades
-	/*(case 110: //Fee
-		{
-			QStringList feeList=QString(getMidData("pairs\":{\"","}}}",&data)).split("},\"");
-			for(int n=0;n<feeList.count();n++)
-			{
-				if(!feeList.at(n).startsWith(baseValues.currentPair.currRequestPair))continue;
-				QByteArray currentFeeData=feeList.at(n).toAscii()+",";
-				double newFee=getMidData("fee\":",",",&currentFeeData).toDouble();
-				if(newFee!=lastFee)emit accFeeChanged(newFee);
-				lastFee=newFee;
-			}
-		}
-		break;// Fee
-	*/
 	case 111: //all active orders 
 		//All ok
 		{
@@ -337,10 +327,10 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 		}
 		break;
 	case 202: //info
+	//array of arrays
 		{
 			if(!success)break;
-			QByteArray fundsData=getMidData("funds\":{","}",&data)+",";
-			QByteArray btcBalance=getMidData(baseValues.currentPair.currAStrLow+"\":",",",&fundsData);
+			QByteArray btcBalance=getMidData("\"BTC\", ","]",&data);
 			if(!btcBalance.isEmpty())
 			{
 				double newBtcBalance=btcBalance.toDouble();
@@ -348,7 +338,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				lastBtcBalance=newBtcBalance;
 			}
 
-			QByteArray usdBalance=getMidData("\""+baseValues.currentPair.currBStrLow+"\":",",",&fundsData);
+			QByteArray usdBalance=getMidData("\"USD\", ","]",&data);
 			if(!usdBalance.isEmpty())
 			{
 				double newUsdBalance=usdBalance.toDouble();
@@ -356,34 +346,14 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				lastUsdBalance=newUsdBalance;
 			}
 
-			int openedOrders=getMidData("open_orders\":",",\"",&data).toInt();
-			if(openedOrders==0&&lastOpenedOrders){lastOrders.clear(); emit ordersIsEmpty();}
-			lastOpenedOrders=openedOrders;
-
-			if(isFirstAccInfo)
-			{
-				QByteArray rights=getMidData("rights\":{","}",&data);
-				if(!rights.isEmpty())
-				{
-					bool isRightsGood=rights.contains("info\":1")&&rights.contains("trade\":1");
-					if(!isRightsGood)emit showErrorMessage("I:>invalid_rights");
-					isFirstAccInfo=false;
-				}
-			}
 		}
 		break;//info
 	case 204://orders
 		{
 		if(data.size()<=30)break;
-		bool isEmptyOrders=!success&&errorString==QLatin1String("no orders");if(isEmptyOrders)success=true;
 		if(lastOrders!=data)
 		{
 			lastOrders=data;
-			if(isEmptyOrders)
-			{
-				emit ordersIsEmpty();
-				break;
-			}
 			data.replace("return\":{\"","},\"");
 			QString rezultData;
 			QStringList ordersList=QString(data).split("},\"");
@@ -416,47 +386,64 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 			if(!oid.isEmpty())emit orderCanceled(oid);
 		}
 		break;//order/cancel
+	case 306: {//order/buy{
+			if(!success||!debugLevel)break;
+			  if(data.startsWith("{\"id\""))logThread->writeLog("Buy OK: "+data);
+			  else logThread->writeLog("Invalid Order Buy Data:"+data);
+			break;//order/buy
+		}
+	case 307: {//order/sell{
+			if(!success||!debugLevel)break;
+			  if(data.startsWith("{\"id\""))logThread->writeLog("Sell OK: "+data);
+			  else logThread->writeLog("Invalid Order Sell Data:"+data);
+			break;//order/sell
+		}
+	/*
 	case 306: if(debugLevel)logThread->writeLog("Buy OK: "+data,2);break;//order/buy
-	case 307: if(debugLevel)logThread->writeLog("Sell OK: "+data,2);break;//order/sell
+	case 307: if(debugLevel)logThread->writeLog("Sell OK: "+data,2);break;//order/sell*/
 	case 208: ///history
 		{
-		bool isEmptyOrders=!success&&errorString==QLatin1String("no trades");if(isEmptyOrders)success=true;
-		if(lastHistory!=data)
+		if(!success)break;
+		if(data.startsWith("["))
 		{
-			lastHistory=data;
-			if(!success)break;
-			QList<HistoryItem> *historyItems=new QList<HistoryItem>;
-
-			QString newLog(data);
-			QStringList dataList=newLog.split("\":{\"");
-			if(dataList.count())dataList.removeFirst();
-			if(dataList.count())dataList.removeFirst();
-			if(dataList.count()==0)return;
-			newLog.clear();
-			for(int n=0;n<dataList.count();n++)
+			if(lastHistory!=data)
 			{
-				HistoryItem currentHistoryItem;
-
-				QByteArray curLog(dataList.at(n).toAscii());
-				QByteArray logType=getMidData("type\":\"","\",\"",&curLog);
-				if(logType=="sell")currentHistoryItem.type=1;
-				else 
-				if(logType=="buy")currentHistoryItem.type=2;
+				lastHistory=data;
+				if(data=="[]")break;
 				
-				if(currentHistoryItem.type)
+				
+				QList<HistoryItem> *historyItems=new QList<HistoryItem>;
+				QString newLog(data);
+				newLog= newLog.mid(1, newLog.length()-2); //delete open [ and close]
+				QStringList dataList=newLog.split("], [");
+				for(int n=0;n<dataList.count();n++)
 				{
-					QStringList currencyPair;
-					if(currentHistoryItem.type==1||currentHistoryItem.type==2)
-						currentHistoryItem.symbol=getMidData("pair\":\"","\",\"",&curLog).toUpper().replace("_","");
-					currentHistoryItem.dateTimeInt=getMidData("timestamp\":","}",&curLog).toUInt();
-					currentHistoryItem.price=getMidData("rate\":",",\"",&curLog).toDouble();
-					currentHistoryItem.volume=getMidData("amount\":",",\"",&curLog).toDouble();
+					HistoryItem currentHistoryItem;
+					QStringList itemsList = dataList.at(n).split(", ");//break to items
+					bool tr= (itemsList.at(0)=="\'buy\'")||(itemsList.at(0)=="\'sell\'");
+					if (tr){//it was trade
+						if (itemsList.at(1)=="\'btc_usd\'") //- pair of deal: 'btc_usd' or 'ltc_usd'
+							currentHistoryItem.symbol="BTCUSD";
+						else
+							currentHistoryItem.symbol="LTCUSD";
+						currentHistoryItem.price=itemsList.at(2).toDouble();// price
+						currentHistoryItem.volume=itemsList.at(3).toDouble();// - base amount
+						currentHistoryItem.type= (itemsList.at(0)=="\'buy\'")?2:1;
+					}
+					else{// in|out
+						currentHistoryItem.type= (itemsList.at(0)=="\'in\'")?4:5;
+					}
+					QDateTime orderDateTime=QDateTime::fromString(itemsList.at(6).toAscii(),"MM/dd/yyyy HH:mm:ss");
+					orderDateTime.setTimeSpec(Qt::UTC);
+					currentHistoryItem.dateTimeInt=orderDateTime.toTime_t();
 					if(currentHistoryItem.isValid())(*historyItems)<<currentHistoryItem;
+				
+					emit historyChanged(historyItems);
 				}
 			}
-			emit historyChanged(historyItems);
 		}
 		break;//money/wallet/history
+		
 		}
 	default: break;
 	}
@@ -466,10 +453,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 	{
 		errorCount++;
 		if(errorCount<3)return;
-		if(debugLevel)logThread->writeLog("API error: "+errorString.toAscii()+" ReqType:"+QByteArray::number(reqType),2);
-		if(errorString.isEmpty())return;
-		if(errorString==QLatin1String("no orders"))return;
-		if(reqType<300)emit showErrorMessage("I:>"+errorString);
+	//	if(debugLevel)logThread->writeLog("API error: "+" ReqType:"+QByteArray::number(reqType),2);
 	}
 	else errorCount=0;
 }
@@ -525,15 +509,17 @@ void Exchange_Indacoin::secondSlot()
 	static int infoCounter=0;
 	if(lastHistory.isEmpty())getHistory(false);
 
-	if(!isReplayPending(202))sendToApi(202,"",true,baseValues.httpSplitPackets,"method=getInfo&");
+	if(!isReplayPending(202))
+		sendToApi(202,"getbalance",true,baseValues.httpSplitPackets);
 
-	if(!tickerOnly&&!isReplayPending(204))sendToApi(204,"",true,baseValues.httpSplitPackets,"method=ActiveOrders&");
-	if(!isReplayPending(103))sendToApi(103,"ticker",false,baseValues.httpSplitPackets);
-	if(!isReplayPending(109))sendToApi(109,"trades/"+baseValues.currentPair.currRequestPair,false,baseValues.httpSplitPackets);//+tid!!!
+	if(!tickerOnly&&!isReplayPending(204))sendToApi(204,"openorders",true,baseValues.httpSplitPackets);
+	if(!isReplayPending(103))sendToApi(103,"new/ticker/"+baseValues.currentPair.currRequestPair,false,baseValues.httpSplitPackets);
+	if(!isReplayPending(109))
+		sendToApi(109,"trades/"+baseValues.currentPair.currRequestPair+"/0/"+QByteArray::number(QDateTime::currentMSecsSinceEpoch ()-3600),false,baseValues.httpSplitPackets);
 	if(depthEnabled&&(forceDepthLoad||/*infoCounter==3&&*/!isReplayPending(111)))
 	{
 		emit depthRequested();
-		sendToApi(111,"orderbook?pair={"+baseValues.currentPair.currRequestPair+'}',false,baseValues.httpSplitPackets);
+		sendToApi(111,"orderbook?pair="+baseValues.currentPair.currRequestPair,false,baseValues.httpSplitPackets);
 		forceDepthLoad=false;
 	}
 
@@ -552,39 +538,38 @@ void Exchange_Indacoin::getHistory(bool force)
 {
 	if(tickerOnly)return;
 	if(force)lastHistory.clear();
-	if(!isReplayPending(208))sendToApi(208,"",true,baseValues.httpSplitPackets,"method=TradeHistory&");
-	if(!isReplayPending(110))sendToApi(110,"info",false,baseValues.httpSplitPackets);
-	if(!baseValues.httpSplitPackets&&julyHttp)julyHttp->prepareDataSend();
+	if(!isReplayPending(208))
+		sendToApi(208,"gethistory",true,baseValues.httpSplitPackets);
 }
 
 void Exchange_Indacoin::buy(double apiBtcToBuy, double apiPriceToBuy)
 {
 	if(tickerOnly)return;
-	QByteArray data="buyorder/{pair:\'"+baseValues.currentPair.currRequestPair;
+	QByteArray data="pair:\'"+baseValues.currentPair.currRequestPair;
 	data+="\',price:\'"+QByteArray::number(apiPriceToBuy,'f',baseValues.currentPair.priceDecimals);
-	data+="\',amount:\'"+QByteArray::number(apiBtcToBuy,'f',8)+"\'}";
+	data+="\',amount:\'"+QByteArray::number(apiBtcToBuy,'f',8)+'\'';
 	if(debugLevel)logThread->writeLog("Sell: "+data,2);
-	sendToApi(307,"",true,true,data);
+	sendToApi(307,"buyorder",true,true,data);
 }
 
 void Exchange_Indacoin::sell(double apiBtcToSell, double apiPriceToSell)
 {
 	if(tickerOnly)return;
-	QByteArray data="sellorder/{pair:\'"+baseValues.currentPair.currRequestPair;
+	QByteArray data="pair:\'"+baseValues.currentPair.currRequestPair;
 	data+="\',price:\'"+QByteArray::number(apiPriceToSell,'f',baseValues.currentPair.priceDecimals);
-	data+="\',amount:\'"+QByteArray::number(apiBtcToSell,'f',8)+"\'}";
+	data+="\',amount:\'"+QByteArray::number(apiBtcToSell,'f',8)+'\'';
 	if(debugLevel)logThread->writeLog("Sell: "+data,2);
-	sendToApi(307,"",true,true,data);
+	sendToApi(307,"sellorder",true,true,data);
 }
 
 void Exchange_Indacoin::cancelOrder(QByteArray order)
 {
 	if(tickerOnly)return;
 
-	order.prepend("cancelorder/{i:\'");
-	order.append("\'}");
+	order.prepend("i:\'");
+	order.append('\'');
 	if(debugLevel)logThread->writeLog("Cancel order: "+order,2);
-	sendToApi(305,"",true,true,order);
+	sendToApi(305,"cancelorder",true,true,order);
 }
 
 void Exchange_Indacoin::sendToApi(int reqType, QByteArray method, bool auth, bool sendNow, QByteArray commands)
@@ -602,27 +587,35 @@ void Exchange_Indacoin::sendToApi(int reqType, QByteArray method, bool auth, boo
 
 	if(auth)
 	{
-		QByteArray postData=commands+"nonce="+QByteArray::number(++privateNonce);
+		QByteArray sign=method+QByteArray::number(++privateNonce)+privateRestKey;
+		std::string signStr=ecdsaSha1(sign);
+		sign.clear();
+		sign=signStr.c_str();//without'\0'
+		//Add headers;
+		QByteArray postData="API-key: "+privateRestKey;
+		postData+= "&API-sign: "+sign;
+		postData+= "&API-nonce: "+QByteArray::number(privateNonce);
 		if(sendNow)
-			julyHttp->sendData(reqType, "POST /api/"+method, postData, "Sign: "+hmacSha512(privateRestSign,postData).toHex()+"\r\n");
+			julyHttp->sendData(reqType, "POST /api/"+method, postData);
 		else
-			julyHttp->prepareData(reqType, "POST /api/"+method, postData, "Sign: "+hmacSha512(privateRestSign,postData).toHex()+"\r\n");
+			julyHttp->prepareData(reqType, "POST /api/"+method, postData);
 	}
 	else
 	{
-		if(commands.isEmpty())
+		if(!commands.isEmpty())
+
 		{
 			if(sendNow)
-				julyHttp->sendData(reqType, "GET /api/3/"+method);
+				julyHttp->sendData(reqType, "POST /api/"+method, commands);
 			else 
-				julyHttp->prepareData(reqType, "GET /api/3/"+method);
+				julyHttp->prepareData(reqType, "POST /api/"+method, commands);
 		}
 		else
 		{
-			if(sendNow)
-				julyHttp->sendData(reqType, "POST /api/3/"+method, commands);
-			else 
-				julyHttp->prepareData(reqType, "POST /api/3/"+method, commands);
+			//if(sendNow)
+				julyHttp->sendData(reqType, "GET /api/"+method);
+			//else 
+				//julyHttp->prepareData(reqType, "GET /api/"+method);
 		}
 	}
 }
@@ -633,4 +626,75 @@ void Exchange_Indacoin::sslErrors(const QList<QSslError> &errors)
 	for(int n=0;n<errors.count();n++)errorList<<errors.at(n).errorString();
 	if(debugLevel)logThread->writeLog(errorList.join(" ").toAscii(),2);
 	emit showErrorMessage("SSL Error: "+errorList.join(" "));
+}
+
+std::string ecdsaSha1(QByteArray Qsign){
+//	method="sellorderbysum";
+//	key="Pq75pGlJQfRUcfdujWAk";
+	//QByteArray Qsign=method+QByteArray::number(nonce)+key;
+	unsigned char* sign;
+	sign = new unsigned char[Qsign.size()+1];
+	sign[Qsign.size()]='\0';
+	strcpy((char*)sign,Qsign.data());
+	
+	EC_KEY    *eckey;
+	eckey = EC_KEY_new_by_curve_name(NID_secp256k1);//secp256k1
+	EC_KEY_generate_key(eckey);
+	
+	unsigned char  *pp,*buffer;
+
+	unsigned int buf_len;
+	buf_len = ECDSA_size(eckey);
+	buffer  = (unsigned char*)OPENSSL_malloc(buf_len);
+	pp=buffer;
+	int ret=ECDSA_sign(0, sign, 20, pp, &buf_len, eckey);
+	ret=ECDSA_verify(0, sign, 20, buffer, buf_len, eckey);
+	std::string res=base64_encode(pp,buf_len);
+	
+	
+	delete []sign;
+	return res;
+}	 
+
+std::string base64_encode(unsigned char const* bytes_to_encode, unsigned int in_len) {
+  std::string ret;
+  int i = 0;
+  int j = 0;
+  unsigned char char_array_3[3];
+  unsigned char char_array_4[4];
+
+  while (in_len--) {
+    char_array_3[i++] = *(bytes_to_encode++);
+    if (i == 3) {
+      char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+      char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+      char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+      char_array_4[3] = char_array_3[2] & 0x3f;
+
+      for(i = 0; (i <4) ; i++)
+        ret += base64_chars[char_array_4[i]];
+      i = 0;
+    }
+  }
+
+  if (i)
+  {
+    for(j = i; j < 3; j++)
+      char_array_3[j] = '\0';
+
+    char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+    char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+    char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+    char_array_4[3] = char_array_3[2] & 0x3f;
+
+    for (j = 0; (j < i + 1); j++)
+      ret += base64_chars[char_array_4[j]];
+
+    while((i++ < 3))
+      ret += '=';
+
+  }
+
+  return ret;
+
 }

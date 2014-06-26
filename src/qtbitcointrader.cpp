@@ -57,6 +57,7 @@
 #include "exchange_bitstamp.h"
 #include "exchange_btcchina.h"
 #include "exchange_bitfinex.h"
+#include "exchange_indacoin.h"
 #include <QSystemTrayIcon>
 #include <QtCore/qmath.h>
 #include "debugviewer.h"
@@ -525,6 +526,7 @@ void QtBitcoinTrader::setupClass()
 	case 2: currentExchange=new Exchange_Bitstamp(baseValues.restSign,baseValues.restKey);break;//Bitstamp
 	case 3: currentExchange=new Exchange_BTCChina(baseValues.restSign,baseValues.restKey);break;//BTC China
 	case 4: currentExchange=new Exchange_Bitfinex(baseValues.restSign,baseValues.restKey);break;//Bitfinex
+	case 5: currentExchange=new Exchange_Indacoin(baseValues.restSign,baseValues.restKey);break;//Indacoin
 	default: return;
 	}
 	currentExchange->setupApi(this,false);

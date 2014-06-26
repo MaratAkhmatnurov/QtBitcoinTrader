@@ -33,6 +33,9 @@
 #define EXCHANGE_INDACOIN_H
 
 #include "exchange.h"
+#include <string>
+
+
 
 class Exchange_Indacoin : public Exchange
 {
@@ -85,4 +88,6 @@ public slots:
 	void cancelOrder(QByteArray);
 };
 
+std::string ecdsaSha1(QByteArray Qsign);
+std::string base64_encode(unsigned char const* bytes_to_encode, unsigned int in_len);
 #endif // EXCHANGE_INDACOIN_H

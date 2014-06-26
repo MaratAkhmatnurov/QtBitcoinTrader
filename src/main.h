@@ -138,5 +138,4 @@ struct BaseValues
 
 #define baseValues (*baseValues_)
 extern BaseValues *baseValues_;
-
 #endif // MAIN_H

@@ -1,0 +1,41 @@
+
+		if(!success)break;
+		if(data=="[]"){lastOrders.clear();emit ordersIsEmpty();break;}
+		if(data.startsWith("[")&&data.endsWith("]"))
+		{
+			if(lastOrders!=data)
+			{
+				lastOrders=data;
+				if(data.size()>3)
+				{
+				data.remove(0,2);
+				data.remove(data.size()-2,2);
+				}
+				QStringList ordersList=QString(data).split("], [");
+				QList<OrderItem> *orders=new QList<OrderItem>;
+				for(int n=0;n<ordersList.count();n++)
+				{	
+					OrderItem currentOrder;
+					QStringList itemsList=ordersList.at(n).split(",");
+					currentOrder.oid=itemsList.at(0).toAscii();
+
+					QDateTime orderDateTime=QDateTime::fromString(itemsList.at(6).toAscii(),"MM/dd/yyyy HH:mm:ss");
+					orderDateTime.setTimeSpec(Qt::UTC);
+					currentOrder.date=orderDateTime.toTime_t();
+					
+					/*currentOrder.type=getMidData("\"type\": ",",",&currentOrderData)=="1";
+					currentOrder.status=1;
+					*/
+					currentOrder.amount=itemsList.at(4).toDouble();
+					
+					currentOrder.price=itemsList.at(3).toDouble();
+					
+					currentOrder.symbol=baseValues.currentPair.currSymbol;
+					if(currentOrder.isValid())(*orders)<<currentOrder;
+				}
+				emit ordersChanged(orders);
+				lastInfoReceived=false;
+			}
+		}
+		else if(debugLevel)logThread->writeLog("Invalid Orders data:"+data,2);
+		break;//open_orders
