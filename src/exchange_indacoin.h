@@ -61,6 +61,7 @@ private:
 
 	QList<DepthItem> *depthAsks;
 	QList<DepthItem> *depthBids;
+	QList<QByteArray> cancelingOrderIDs;
 
 	QMap<double,double> lastDepthAsksMap;
 	QMap<double,double> lastDepthBidsMap;

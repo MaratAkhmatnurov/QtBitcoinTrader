@@ -92,6 +92,7 @@ Exchange_Indacoin::~Exchange_Indacoin()
 void Exchange_Indacoin::clearVariables()
 {
 	isFirstTicker=true;
+	cancelingOrderIDs.clear();
 	isFirstAccInfo=true;
 	Exchange::clearVariables();
 	lastOpenedOrders=-1;
@@ -388,8 +389,14 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 	case 305: //order/cancel
 		if(success)
 		{
-			QByteArray oid=getMidData("order_id\":",",\"",&data);
-			if(!oid.isEmpty())emit orderCanceled(oid);
+			if(!success)break;
+			if(!cancelingOrderIDs.isEmpty()){
+				if(data.contains("success"))
+					emit orderCanceled(cancelingOrderIDs.first());
+				if(debugLevel)
+					logThread->writeLog("Order canceled:"+cancelingOrderIDs.first(),2);
+				cancelingOrderIDs.removeFirst();
+			}
 		}
 		break;//order/cancel
 	case 306: {//order/buy{
@@ -513,7 +520,7 @@ bool Exchange_Indacoin::isReplayPending(int reqType)
 void Exchange_Indacoin::secondSlot()
 {
 	static int infoCounter=0;
-	if(lastHistory.isEmpty())getHistory(false);
+	if(lastHistory.isEmpty())getHistory(false); 
 
 	if(!isReplayPending(202))
 		sendToApi(202,"getbalance",true,baseValues.httpSplitPackets,"");
@@ -531,7 +538,7 @@ void Exchange_Indacoin::secondSlot()
 		sendToApi(111,"orderbook?pair="+baseValues.currentPair.currRequestPair,false,baseValues.httpSplitPackets);
 		forceDepthLoad=false;
 	}
-
+	
 	if(!baseValues.httpSplitPackets&&julyHttp)
 		julyHttp->prepareDataSend();
 
@@ -543,7 +550,7 @@ void Exchange_Indacoin::secondSlot()
 	}
 	Exchange::secondSlot();
 }
-
+ 
 void Exchange_Indacoin::getHistory(bool force)
 {
 	if(tickerOnly)return;
@@ -555,19 +562,19 @@ void Exchange_Indacoin::getHistory(bool force)
 void Exchange_Indacoin::buy(double apiBtcToBuy, double apiPriceToBuy)
 {
 	if(tickerOnly)return;
-	QByteArray data="pair:\'"+baseValues.currentPair.currRequestPair;
-	data+="\',price:\'"+QByteArray::number(apiPriceToBuy,'f',baseValues.currentPair.priceDecimals);
-	data+="\',amount:\'"+QByteArray::number(apiBtcToBuy,'f',8)+'\'';
+	QByteArray data="\"pair\":\'"+baseValues.currentPair.currRequestPair;
+	data+="\',\"price\":\'"+QByteArray::number(apiPriceToBuy,'f',baseValues.currentPair.priceDecimals);
+	data+="\',\"amount\":\'"+QByteArray::number(apiBtcToBuy,'f',8)+'\'';
 	if(debugLevel)logThread->writeLog("Sell: "+data,2);
-	sendToApi(307,"buyorder",true,true,data);
+	sendToApi(306,"buyorder",true,true,data);
 }
 
 void Exchange_Indacoin::sell(double apiBtcToSell, double apiPriceToSell)
 {
 	if(tickerOnly)return;
-	QByteArray data="pair:\'"+baseValues.currentPair.currRequestPair;
-	data+="\',price:\'"+QByteArray::number(apiPriceToSell,'f',baseValues.currentPair.priceDecimals);
-	data+="\',amount:\'"+QByteArray::number(apiBtcToSell,'f',8)+'\'';
+	QByteArray data="\"pair\":\'"+baseValues.currentPair.currRequestPair;
+	data+="\',\"price\":\'"+QByteArray::number(apiPriceToSell,'f',baseValues.currentPair.priceDecimals);
+	data+="\',\"amount\":\'"+QByteArray::number(apiBtcToSell,'f',8)+'\'';
 	if(debugLevel)logThread->writeLog("Sell: "+data,2);
 	sendToApi(307,"sellorder",true,true,data);
 }
@@ -575,7 +582,7 @@ void Exchange_Indacoin::sell(double apiBtcToSell, double apiPriceToSell)
 void Exchange_Indacoin::cancelOrder(QByteArray order)
 {
 	if(tickerOnly)return;
-
+	cancelingOrderIDs<<order;
 	order.prepend("i:\'");
 	order.append('\'');
 	if(debugLevel)logThread->writeLog("Cancel order: "+order,2);
