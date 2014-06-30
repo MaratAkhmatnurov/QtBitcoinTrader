@@ -82,7 +82,7 @@ Exchange_Indacoin::Exchange_Indacoin(QByteArray pRestSign, QByteArray pRestKey)
 	supportsExchangeLag=false;
 
 	authRequestTime.restart();
-	privateNonce=(static_cast<quint32>(time(NULL))-1371854884)*10;//?
+	privateNonce=(static_cast<quint32>(time(NULL))-1371854884)*10;
 }
 
 Exchange_Indacoin::~Exchange_Indacoin()
@@ -121,7 +121,7 @@ void Exchange_Indacoin::reloadDepth()
 void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 {
 	if(debugLevel)logThread->writeLog("RCV: "+data);
-	bool success=data.startsWith("{")&&!data.startsWith("{\"error\":")||data.startsWith("[");
+	bool success=data.startsWith("{")&&!data.startsWith("{\"error\":")||data.startsWith("[")||data.startsWith("\"");
 	if(success&&data.startsWith("401"))success=false;
 
 	if(debugLevel)logThread->writeLog("RCV: "+data);
@@ -361,25 +361,27 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 		if(lastOrders!=data)
 		{
 			lastOrders=data;
-			data.replace("return\":{\"","},\"");
+			data=data.mid(3,data.size()-4);//delete open [[" and close "]]
 			QString rezultData;
-			QStringList ordersList=QString(data).split("},\"");
-			if(ordersList.count())ordersList.removeFirst();
-			if(ordersList.count()==0)return;
-
+			QStringList ordersList=QString(data).split("\"],[\"");
 			QList<OrderItem> *orders=new QList<OrderItem>;
 			for(int n=0;n<ordersList.count();n++)
 			{
 				OrderItem currentOrder;
-				QByteArray currentOrderData="{"+ordersList.at(n).toAscii()+"}";
+				QStringList itemsList=ordersList.at(n).split("\",\"");
 
-				currentOrder.oid=getMidData("{","\":{",&currentOrderData);
-				currentOrder.date=getMidData("timestamp_created\":",",\"",&currentOrderData).toUInt();
-				currentOrder.type=getMidData("type\":\"","\",\"",&currentOrderData)=="sell";
-				currentOrder.status=getMidData("status\":","}",&currentOrderData).toInt()+1;
-				currentOrder.amount=getMidData("amount\":",",\"",&currentOrderData).toDouble();
-				currentOrder.price=getMidData("rate\":",",\"",&currentOrderData).toDouble();
-				currentOrder.symbol=getMidData("pair\":\"","\",\"",&currentOrderData).toUpper().replace("_","");
+				currentOrder.oid=itemsList.at(0).toAscii();
+				QDateTime orderDateTime=QDateTime::fromString(itemsList.at(6).toAscii(),"MM/dd/yyyy HH:mm:ss");
+				orderDateTime.setTimeSpec(Qt::UTC);
+				currentOrder.date=orderDateTime.toTime_t();
+				currentOrder.type=itemsList.at(2)=="SELL";
+				currentOrder.status=1;
+				//if (currentOrder.type)
+					//currentOrder.amount=itemsList.at(4).toDouble();
+				//else
+					currentOrder.amount=itemsList.at(5).toDouble();
+				currentOrder.price=itemsList.at(3).toDouble();
+				currentOrder.symbol=itemsList.at(1).toAscii().toUpper().replace("_","");
 				if(currentOrder.isValid())(*orders)<<currentOrder;
 			}
 			emit ordersChanged(orders);
@@ -424,38 +426,45 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				lastHistory=data;
 				if(data=="[]")break;
 				
-				
 				QList<HistoryItem> *historyItems=new QList<HistoryItem>;
 				QString newLog(data);
 				newLog= newLog.mid(1, newLog.length()-2); //delete open [ and close]
-				QStringList dataList=newLog.split("], [");
+				QStringList dataList=newLog.split("],[");
+				dataList[0]=dataList.at(0).mid(1,dataList.at(0).length()-1);
+				dataList[dataList.size()-1]=dataList.at(dataList.size()-1).mid(0,dataList.at(0).length()-2);
 				for(int n=0;n<dataList.count();n++)
 				{
 					HistoryItem currentHistoryItem;
-					QStringList itemsList = dataList.at(n).split(", ");//break to items
-					bool tr= (itemsList.at(0)=="\'buy\'")||(itemsList.at(0)=="\'sell\'");
+					QStringList itemsList = dataList.at(n).split(",");//break to items
+					bool tr= (itemsList.at(0)=="\"BUY\"")||(itemsList.at(0)=="\"SELL\"");
 					if (tr){//it was trade
-						if (itemsList.at(1)=="\'btc_usd\'") //- pair of deal: 'btc_usd' or 'ltc_usd'
+						if (itemsList.at(1)=="\"BTC_USD\"") //- pair of deal: 'btc_usd' or 'ltc_usd'
 							currentHistoryItem.symbol="BTCUSD";
 						else
 							currentHistoryItem.symbol="LTCUSD";
+						//delete quotes
+						itemsList[2]=itemsList.at(2).mid(1,itemsList.at(2).length()-2);
+						itemsList[3]=itemsList.at(3).mid(1,itemsList.at(3).length()-2);
+						itemsList[6]=itemsList.at(6).mid(1,itemsList.at(6).length()-2);
+
 						currentHistoryItem.price=itemsList.at(2).toDouble();// price
 						currentHistoryItem.volume=itemsList.at(3).toDouble();// - base amount
-						currentHistoryItem.type= (itemsList.at(0)=="\'buy\'")?2:1;
+						currentHistoryItem.type= (itemsList.at(0)=="\"BUY\"")?2:1;
 					}
 					else{// in|out
-						currentHistoryItem.type= (itemsList.at(0)=="\'in\'")?4:5;
+						currentHistoryItem.type= (itemsList.at(0)=="\"IN\"")?4:5;
 					}
 					QDateTime orderDateTime=QDateTime::fromString(itemsList.at(6).toAscii(),"MM/dd/yyyy HH:mm:ss");
 					orderDateTime.setTimeSpec(Qt::UTC);
 					currentHistoryItem.dateTimeInt=orderDateTime.toTime_t();
-					if(currentHistoryItem.isValid())(*historyItems)<<currentHistoryItem;
-				
-					emit historyChanged(historyItems);
-				}
+					if(currentHistoryItem.isValid())// && currentHistoryItem.symbol==currencyPairInfo.currSymbol)
+						(*historyItems)<<currentHistoryItem;
+
+				}				
+				emit historyChanged(historyItems);
 			}
 		}
-		break;//money/wallet/history
+		break;//history
 		
 		}
 	default: break;
@@ -574,7 +583,7 @@ void Exchange_Indacoin::sell(double apiBtcToSell, double apiPriceToSell)
 	if(tickerOnly)return;
 	QByteArray data="\"pair\":\'"+baseValues.currentPair.currRequestPair;
 	data+="\',\"price\":\'"+QByteArray::number(apiPriceToSell,'f',baseValues.currentPair.priceDecimals);
-	data+="\',\"amount\":\'"+QByteArray::number(apiBtcToSell,'f',8)+'\'';
+	data+="\',\"amount\":\'"+QByteArray::number(apiBtcToSell*apiPriceToSell,'f',8)+'\'';
 	if(debugLevel)logThread->writeLog("Sell: "+data,2);
 	sendToApi(307,"sellorder",true,true,data);
 }
@@ -593,7 +602,7 @@ void Exchange_Indacoin::sendToApi(int reqType, QByteArray method, bool auth, boo
 {
 	if(julyHttp==0)
 	{ 
-		julyHttp=new JulyHttp("indacoin.com","",this);
+		julyHttp=new JulyHttp("indacoin.com","",this, true,true,"application/json; charset=UTF-8");
 		connect(julyHttp,SIGNAL(anyDataReceived()),baseValues_->mainWindow_,SLOT(anyDataReceived()));
 		connect(julyHttp,SIGNAL(apiDown(bool)),baseValues_->mainWindow_,SLOT(setApiDown(bool)));
 		connect(julyHttp,SIGNAL(setDataPending(bool)),baseValues_->mainWindow_,SLOT(setDataPending(bool)));
@@ -613,10 +622,21 @@ void Exchange_Indacoin::sendToApi(int reqType, QByteArray method, bool auth, boo
 		appendHeader+= "\r\nAPI-Sign: "+sign;
 		appendHeader+= "\r\nAPI-Nonce: "+QByteArray::number(privateNonce)+"\r\n";
 		QByteArray postData='{'+commands+'}';
-		if(sendNow)
-			julyHttp->sendData(reqType, "POST /api/"+method,postData, appendHeader);
-		else
-			julyHttp->prepareData(reqType, "POST /api/"+method,postData, appendHeader);
+		if(!commands.isEmpty())
+		{
+			appendHeader+= "Accept: application/json, text/javascript, */*; q=0.01\r\n";
+			if(sendNow)
+				julyHttp->sendData(reqType, "POST /api/"+method, postData, appendHeader);
+			else 
+				julyHttp->prepareData(reqType, "POST /api/"+method, postData, appendHeader);
+		}
+		else{
+			if(sendNow)
+				julyHttp->sendData(reqType, "POST /api/"+method,postData, appendHeader);
+			else
+				julyHttp->prepareData(reqType, "POST /api/"+method,postData, appendHeader);
+
+		}
 	}
 	else
 	{
