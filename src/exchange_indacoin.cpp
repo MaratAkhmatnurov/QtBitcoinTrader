@@ -194,7 +194,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 			{
 				QByteArray tradeData=tradeList.at(n).toAscii()+"}";
 				TradesItem newItem;
-				newItem.date=getMidData("date\":","}",&tradeData).toUInt();
+				newItem.date=getMidData("date\":","}",&tradeData).toUInt() -3600*4;
 				newItem.price=getMidData("\"price\":",",\"",&tradeData).toDouble();
 				//if(lastFetchTid<0&&newItem.date<-lastFetchTid)continue;
 				quint32 currentTid=getMidData("\"tid\":",",\"",&tradeData).toUInt();
@@ -208,6 +208,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				newItem.amount=getMidData("\"amount\":",",\"",&tradeData).toDouble();
 				newItem.symbol=currentRequestSymbol;
 				newItem.orderType=getMidData("\"oper_type\":\"","\"",&tradeData)=="0"?1:-1;
+				newItem.symbol=baseValues.currentPair.currSymbol;
 
 				if(newItem.isValid())
 					(*newTradesItems)<<newItem;
@@ -337,7 +338,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 	//array of arrays
 		{
 			if(!success)break;
-			QByteArray btcBalance=getMidData("\"BTC\",\"","\"]",&data);
+			QByteArray btcBalance=getMidData("\""+baseValues.currentPair.currAStr+"\",\"","\"]",&data);
 			if(!btcBalance.isEmpty())
 			{
 				double newBtcBalance=btcBalance.toDouble();
