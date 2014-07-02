@@ -194,7 +194,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 			{
 				QByteArray tradeData=tradeList.at(n).toAscii()+"}";
 				TradesItem newItem;
-				newItem.date=getMidData("date\":","}",&tradeData).toUInt() -3600*4;
+				newItem.date=getMidData("date\":","}",&tradeData).toUInt();
 				newItem.price=getMidData("\"price\":",",\"",&tradeData).toDouble();
 				//if(lastFetchTid<0&&newItem.date<-lastFetchTid)continue;
 				quint32 currentTid=getMidData("\"tid\":",",\"",&tradeData).toUInt();
@@ -450,7 +450,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 						currentHistoryItem.type= (itemsList.at(0)=="\"IN\"")?4:5;
 					}
 					QDateTime orderDateTime=QDateTime::fromString(itemsList.at(6).toAscii(),"MM/dd/yyyy HH:mm:ss");
-					//orderDateTime.setTimeSpec(Qt::UTC);
+					orderDateTime.setTimeSpec(Qt::UTC);
 					currentHistoryItem.dateTimeInt=orderDateTime.toTime_t();
 					if(currentHistoryItem.isValid())// && currentHistoryItem.symbol==currencyPairInfo.currSymbol)
 						(*historyItems)<<currentHistoryItem;
