@@ -1,3 +1,8 @@
+##Indacoin.com
+https://indacoin.com
+
+Indacoin helps everyman exchange virtual currencies in the most easiest way. Founded in 2013, the Company is headquartered in London. But our main goal is to allow people from all over the world trade bitcoins and other cryptocurrencies.
+
 ## Qt Bitcoin Trader
 
 This software helps you to open and to cancel orders very fast with real time data monitoring.
