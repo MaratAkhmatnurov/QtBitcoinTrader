@@ -371,10 +371,9 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				OrderItem currentOrder;
 				QStringList itemsList=ordersList.at(n).split("\",\"");
 
-				currentOrder.oid=itemsList.at(0).toAscii();
-				QDateTime orderDateTime=QDateTime::fromString(itemsList.at(6).toAscii(),"MM/dd/yyyy HH:mm:ss");
-				orderDateTime.setTimeSpec(Qt::UTC);
-				currentOrder.date=orderDateTime.toTime_t();
+				currentOrder.oid=itemsList.at(0).toAscii();	
+				
+				currentOrder.date=itemsList.at(6).toAscii().toUInt();
 				currentOrder.type=itemsList.at(2)=="SELL";
 				currentOrder.status=1;
 				currentOrder.amount=itemsList.at(5).toDouble();
@@ -449,9 +448,9 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 					else{// in|out
 						currentHistoryItem.type= (itemsList.at(0)=="\"IN\"")?4:5;
 					}
-					QDateTime orderDateTime=QDateTime::fromString(itemsList.at(6).toAscii(),"MM/dd/yyyy HH:mm:ss");
-					orderDateTime.setTimeSpec(Qt::UTC);
-					currentHistoryItem.dateTimeInt=orderDateTime.toTime_t();
+				//	QDateTime orderDateTime=QDateTime::fromString(itemsList.at(6).toAscii(),"MM/dd/yyyy HH:mm:ss");
+				//	orderDateTime.setTimeSpec(Qt::UTC);
+					currentHistoryItem.dateTimeInt=itemsList.at(6).toAscii().toUInt();
 					if(currentHistoryItem.isValid())// && currentHistoryItem.symbol==currencyPairInfo.currSymbol)
 						(*historyItems)<<currentHistoryItem;
 
