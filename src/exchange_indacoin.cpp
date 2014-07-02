@@ -444,18 +444,20 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 						currentHistoryItem.price=itemsList.at(2).toDouble();// price
 						currentHistoryItem.volume=itemsList.at(3).toDouble();// - base amount
 						currentHistoryItem.type= (itemsList.at(0)=="\"BUY\"")?2:1;
+						currentHistoryItem.dateTimeInt=itemsList.at(6).toAscii().toUInt();
 					}
 					else{// in|out
 						currentHistoryItem.type= (itemsList.at(0)=="\"IN\"")?4:5;
+						currentHistoryItem.dateTimeInt=itemsList.at(4).toAscii().toUInt();
 					}
 				//	QDateTime orderDateTime=QDateTime::fromString(itemsList.at(6).toAscii(),"MM/dd/yyyy HH:mm:ss");
 				//	orderDateTime.setTimeSpec(Qt::UTC);
-					currentHistoryItem.dateTimeInt=itemsList.at(6).toAscii().toUInt();
 					if(currentHistoryItem.isValid())// && currentHistoryItem.symbol==currencyPairInfo.currSymbol)
 						(*historyItems)<<currentHistoryItem;
 
-				}				
-				emit historyChanged(historyItems);
+				}
+				if (historyItems->count())
+					emit historyChanged(historyItems);
 			}
 		}
 		break;//history
