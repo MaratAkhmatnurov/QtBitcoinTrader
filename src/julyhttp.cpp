@@ -125,11 +125,13 @@ void JulyHttp::setupSocket()
 	addDefaultCaCertificates(certs);
 	}
 
+
 	setPeerVerifyMode(QSslSocket::VerifyPeer);
 	setSocketOption(QAbstractSocket::KeepAliveOption,true);
 	connect(this,SIGNAL(readyRead()),SLOT(readSocket()));
 	connect(this,SIGNAL(error(QAbstractSocket::SocketError)),this,SLOT(errorSlot(QAbstractSocket::SocketError)));
 	connect(this,SIGNAL(sslErrors(const QList<QSslError> &)),this,SLOT(sslErrorsSlot(const QList<QSslError> &)));
+//	connect(this,SIGNAL(sslErrors(const QList<QSslError> &)),this,SLOT(ignoreSslErrors()));
 }
 
 void JulyHttp::clearPendingData()

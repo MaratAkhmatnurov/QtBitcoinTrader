@@ -152,7 +152,7 @@ void Exchange::setupApi(QtBitcoinTrader *mainClass, bool tickOnly)//Execute only
 {
 	QSettings settingsParams(":/Resources/Exchanges/"+currencyMapFile+".ini",QSettings::IniFormat);
 	QStringList symbolList=settingsParams.childGroups();
-	QList<CurrencyPairItem> *newCurrPairs=new QList<CurrencyPairItem>;
+ 	QList<CurrencyPairItem> *newCurrPairs=new QList<CurrencyPairItem>;
 
 	for(int n=0;n<symbolList.count();n++)
 	{

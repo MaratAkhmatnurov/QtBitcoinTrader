@@ -333,7 +333,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 		else if(debugLevel)logThread->writeLog("Invalid depth data:"+data,2);
 		}
 		break;
-	case 202: //info
+	case 202: //balance
 	//array of arrays
 		{
 			if(!success)break;
@@ -354,7 +354,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 			}
 
 		}
-		break;//info
+		break;//balance
 	case 204://orders
 		{
 		if(data.size()<=30)break;
@@ -376,10 +376,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				currentOrder.date=orderDateTime.toTime_t();
 				currentOrder.type=itemsList.at(2)=="SELL";
 				currentOrder.status=1;
-				//if (currentOrder.type)
-					//currentOrder.amount=itemsList.at(4).toDouble();
-				//else
-					currentOrder.amount=itemsList.at(5).toDouble();
+				currentOrder.amount=itemsList.at(5).toDouble();
 				currentOrder.price=itemsList.at(3).toDouble();
 				currentOrder.symbol=itemsList.at(1).toAscii().toUpper().replace("_","");
 				if(currentOrder.isValid())(*orders)<<currentOrder;
@@ -413,9 +410,6 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 			  else logThread->writeLog("Invalid Order Sell Data:"+data);
 			break;//order/sell
 		}
-	/*
-	case 306: if(debugLevel)logThread->writeLog("Buy OK: "+data,2);break;//order/buy
-	case 307: if(debugLevel)logThread->writeLog("Sell OK: "+data,2);break;//order/sell*/
 	case 208: ///history
 		{
 		if(!success)break;
@@ -455,7 +449,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 						currentHistoryItem.type= (itemsList.at(0)=="\"IN\"")?4:5;
 					}
 					QDateTime orderDateTime=QDateTime::fromString(itemsList.at(6).toAscii(),"MM/dd/yyyy HH:mm:ss");
-					orderDateTime.setTimeSpec(Qt::UTC);
+					//orderDateTime.setTimeSpec(Qt::UTC);
 					currentHistoryItem.dateTimeInt=orderDateTime.toTime_t();
 					if(currentHistoryItem.isValid())// && currentHistoryItem.symbol==currencyPairInfo.currSymbol)
 						(*historyItems)<<currentHistoryItem;
