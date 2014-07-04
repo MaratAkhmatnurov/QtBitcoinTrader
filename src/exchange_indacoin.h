@@ -87,6 +87,7 @@ public slots:
 	void buy(double, double);
 	void sell(double, double);
 	void cancelOrder(QByteArray);
+
 };
 
 std::string ecdsaSha1(QByteArray QsignQsign, QByteArray QKey);

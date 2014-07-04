@@ -43,6 +43,7 @@ static const std::string base64_chars =
              "abcdefghijklmnopqrstuvwxyz"
              "0123456789+/";
 
+static bool UpdBal=true;
 
 Exchange_Indacoin::Exchange_Indacoin(QByteArray pRestSign, QByteArray pRestKey) 
 	: Exchange()
@@ -416,7 +417,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 		if(data.startsWith("["))
 		{
 			if(lastHistory!=data)
-			{
+			{	
 				lastHistory=data;
 				if(data=="[]")break;
 				
@@ -458,6 +459,7 @@ void Exchange_Indacoin::dataReceivedAuth(QByteArray data, int reqType)
 				}
 				if (historyItems->count())
 					emit historyChanged(historyItems);
+				UpdBal=true;
 			}
 		}
 		break;//history
@@ -527,8 +529,10 @@ void Exchange_Indacoin::secondSlot()
 	static int infoCounter=0;
 	if(lastHistory.isEmpty())getHistory(false); 
 
-	if(!isReplayPending(202))
+	if((!isReplayPending(202))&&(UpdBal)){
 		sendToApi(202,"getbalance",true,baseValues.httpSplitPackets,"");
+		UpdBal=false;
+	}
 
 	if(!tickerOnly&&!isReplayPending(204))
 		sendToApi(204,"openorders",true,baseValues.httpSplitPackets,"");
