@@ -583,7 +583,8 @@ void Exchange_Indacoin::sell(double apiBtcToSell, double apiPriceToSell)
 	if(tickerOnly)return;
 	QByteArray data="\"pair\":\'"+baseValues.currentPair.currRequestPair;
 	data+="\',\"price\":\'"+QByteArray::number(apiPriceToSell,'f',baseValues.currentPair.priceDecimals);
-	data+="\',\"amount\":\'"+QByteArray::number(apiBtcToSell*apiPriceToSell,'f',8)+'\'';
+	//data+="\',\"amount\":\'"+QByteArray::number(apiBtcToSell*apiPriceToSell,'f',8)+'\'';
+	data+="\',\"amount\":\'"+QByteArray::number(apiBtcToSell,'f',8)+'\'';
 	if(debugLevel)logThread->writeLog("Sell: "+data,2);
 	sendToApi(307,"sellorder",true,true,data);
 }
