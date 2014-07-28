@@ -536,11 +536,11 @@ void Exchange_Indacoin::secondSlot()
 
 	if(!tickerOnly&&!isReplayPending(204))
 		sendToApi(204,"openorders",true,baseValues.httpSplitPackets,"");
-	if(!isReplayPending(103))sendToApi(103,"new/ticker/"+baseValues.currentPair.currRequestPair,false,baseValues.httpSplitPackets);
+	if(!isReplayPending(103))sendToApi(103,"2/ticker/"+baseValues.currentPair.currRequestPair,false,baseValues.httpSplitPackets);
 	//qint64 now=QDateTime::currentMSecsSinceEpoch ();
 	//QByteArray Since=QByteArray::number(now-3600);
 	if(!isReplayPending(109))
-		sendToApi(109,"new/trades/"+baseValues.currentPair.currRequestPair+"/0/"+QByteArray::number(QDateTime::currentMSecsSinceEpoch ()/1000 -3600),false,baseValues.httpSplitPackets);
+		sendToApi(109,"2/trades/"+baseValues.currentPair.currRequestPair+"/0/"+QByteArray::number(QDateTime::currentMSecsSinceEpoch ()/1000 -3600),false,baseValues.httpSplitPackets);
 	if(depthEnabled&&(forceDepthLoad||/*infoCounter==3&&*/!isReplayPending(111)))
 	{
 		emit depthRequested();
